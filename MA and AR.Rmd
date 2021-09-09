@@ -1,0 +1,477 @@
+---
+title: "Etude d'un MA(1)"
+author: "JAOUANI Badis"
+date: "2/4/2021"
+output: 
+  html_document: 
+    highlight: textmate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+
+## I. Etude d'un processus $AM(1)$
+___
+
+### 1) Paramètres du modèle (à faire varier)
+
+```{r}
+mu <- 0	     # moyenne du processus X[t]
+theta <- 1  # paramètre MA(1)
+sigZ <- 1    # écart-type du bruit Z[t]
+```
+
+### 2) Simulation d'un MA(1) de taille $n$
+
+```{r}
+n <- 200
+x <- rep(0,n)       # initialisation de la série x[t]
+
+z0 <- sigZ*rnorm(1) # simulation de Z[0]
+z <- sigZ*rnorm(n)  # simulation du bruit blanc Z[1], ... , Z[n]
+
+x[1] <- mu + z[1] + theta*z0
+for (t in 2:n) {
+	x[t] <- mu + z[t] + theta*z[t-1]
+}
+```
+
+### 3) Sorties Graphiques
+```{r}
+# Chronogramme de la série simulée ------------------------------------------------------------
+par(mfrow = c(1,1), cex = 0.6)
+plot(x, type='o',
+     pch = 19,
+     xlab="Temps t", 
+     main = "MA(1) simulé")
+abline(h=mu, col="darkred", lwd=1)
+grid(lwd = 0.7)
+
+
+# Représentation de l'ACF ---------------------------------------------------------------------
+par(mfrow = c(1,1), cex = 0.7)
+ro <- acf(x, 20, main="Fonction d'autocorrélation empirique", ylim=c(-0.5,1))
+grid(lwd = 0.7)
+
+
+# Auto-correlations empiriques ----------------------------------------------------------------
+par(mfrow = c(1,1), cex = 0.7)
+lag.plot(x,6,layout=c(3,2),
+         diag.col="darkred",
+         main = 'Auto-corrélations empiriques',
+         pch = 19, cex = 0.4,
+         cex.main = 0.9)
+grid(lwd = 0.7)
+```
+
+## II. Simulation de la série de chômage
+___
+```{r}
+# Load the data & preprocessing
+unemptab <- read.table("unemp.txt")
+unemp <- unemptab$V1
+unemp <- ts(unemp, start = c(1961,1), freq = 12)  # série initiale x(t))
+
+# Plot chronogram
+par(mfrow = c(1,1), cex = 0.7)
+plot(unemp, 
+     col = 'darkred',
+     xlab = 'Year', ylab = 'Unemployement',
+     main = 'Unemployed women between 16 and 19 yo in the U.S ')
+grid(lwd = 0.7)
+
+# Plot ACF
+par(mfrow = c(1,1), cex = 0.7)
+acf(unemp,  main = 'ACF')
+grid(lwd = 0.7)
+```
+
+```{r}
+# Differenciating the time series to get a stationary version
+unemp.diff = diff(unemp)
+mu = mean(unemp.diff)
+  
+# Plot chronogram
+par(mfrow = c(1,1), cex = 0.7)
+plot(unemp.diff,
+     col = 'darkred',
+     xlab = 'Year', ylab = 'Unemployement',
+     main = 'Differentiated series ')
+abline(h = mu, lwd = 0.7)
+grid(lwd = 0.7)
+```
+
+### 1) Estimation de $\sigma$ et $\theta$
+```{r}
+# Estimating sigma
+sig = sd(unemp.diff)
+
+# Autocovariance Function
+par(mfrow = c(1,1), cex = 0.7)
+acf = acf(unemp.diff, lag = 30, main = 'ACF differentiated series')
+grid(lwd = 0.7)
+rho = acf$lag[2]
+
+# Estimating theta
+theta = (1/(2*rho)) * (1 - sqrt(1-4*rho^2))
+```
+
+### 2) Simulation de la série différenciée par $MA(1)$
+```{r}
+n <- 300
+y <- rep(0,n)        # initialisation de la série y[t]
+
+z <- sig * rnorm(n)  # simulation du bruit blanc Z[1], ... , Z[n]
+z[1] = 0
+
+y[1] <- unemp.diff[1]
+for (t in 2:n) {
+	y[t] <- mu + z[t] + theta*z[t-1]
+}
+y = ts(y, start = c(1961,1), freq = 12) 
+```
+
+```{r}
+# Plot de la serie differenciee simulee
+par(mfrow = c(1,1), cex = 0.7)
+plot(y,
+     lty = 2,
+     col = 'darkred',
+     xlab = 'Year', ylab = 'Unemployement',
+     main = 'Simulated differentiated series ')
+lines(unemp.diff,
+     col = 'black',
+     xlab = 'Year', ylab = 'Unemployement',
+     main = 'Differentiated series ')
+abline(h = mu, lwd = 0.7)
+legend(x = 1961, y = 120, 
+       legend = c('simul', 'real'), 
+       lty = c(2,1), 
+       col = c('darkred', 'black'))
+grid(lwd = 0.7)
+
+# Plot de la serie simulee vs. reelle
+ser = diffinv(y)
+par(mfrow = c(1,1), cex = 0.7)
+plot(unemp,
+     col = 'darkred',
+     xlab = 'Year', ylab = 'Unemployement',
+     main = 'Simulated vs. Real series ',
+     ylim = c(0,1500))
+lines(ser + unemp[1],col = 'black')
+legend(x = 1961, y = 1400, 
+       legend = c('Real', 'Simu'), 
+       lty = c(1,1), 
+       col = c('darkred', 'black'))
+grid(lwd = 0.7)
+```
+
+### 3) Simulation directe de la série originale par $MA(1)$
+```{r}
+# Original series
+par(mfrow = c(1,1), cex = 0.7)
+plot(unemp,
+     xlab = 'Year', ylab = 'Unemployement',
+     ylim = c(0,2500), 
+     main = 'Unemployed women between 16 and 19 yo in the U.S ')
+grid(lwd = 0.7)
+
+# Simulation de la série originale par MA(1)
+n <- 300
+y1 <- rep(0,n)        # initialisation de la série y1[t]
+mu = mean(unemp.diff)
+sigY = sd(unemp.diff)
+sig = sigY / sqrt(1+theta^2)
+
+k = 1
+max.simul = 3
+simul = seq(1,max.simul)
+mat.simul = matrix(data = NA, nrow = n, ncol = max.simul)
+for (s in simul){
+  z1 <- sig * rnorm(n)  # simulation du bruit blanc Z1[1], ... , Z1[n]
+  z1[1] = 0
+  y1[1] <- unemp[1]
+  for (t in 2:n) {
+    y1[t] <- y1[t-1] + mu +  z1[t] + theta*z1[t-1]
+  }
+  y1 = ts(y1, start = c(1961,1), freq = 12)
+  mat.simul[,s] = y1
+  k = k+1
+  lines(y1, col = k)
+}
+```
+
+### 4) Variance du processus $(X(t))_t$ en fonction de $t$
+```{r}
+Nsimul = 100
+X.sim = matrix(data = 0, nrow = n, ncol = Nsimul)
+for (sim in 1:Nsimul){
+  z1 <- sig * rnorm(n)  # simulation du bruit blanc Z1[1], ... , Z1[n]
+  z1[1] = 0
+  y1[1] <- unemp[1]
+  for (t in 2:n) {
+    y1[t] <- y1[t-1] + mu +  z1[t] + theta*z1[t-1]
+  }
+  y1 = ts(y1, start = c(1961,1), freq = 12)
+  X.sim[,sim] = y1
+}
+
+# Plot the variance 
+variance = apply(X.sim, MARGIN = 1, FUN = var)
+par(mfrow = c(1,1), cex = 0.7)
+plot(variance,
+     type = 'l',
+     col = 'darkred',
+     xlab = 'Year', ylab = 'Variance',
+     main = 'Variance of the process X(t)')
+grid(lwd = 0.7)
+
+# Plot of the standard deviation
+stand.dev = apply(X.sim, MARGIN = 1, FUN = sd)
+par(mfrow = c(1,1), cex = 0.7)
+plot(stand.dev,
+     type = 'l',
+     col = 'darkred',
+     xlab = 'Year', ylab = 'Standard deviation',
+     main = 'Standard deviation of the process X(t)')
+grid(lwd = 0.7)
+
+# Plot ACF
+par(mfrow = c(1,1), cex = 0.7)
+acf(unemp,  main = 'ACF')
+grid(lwd = 0.7)
+```
+
+## III. Etude d'un processus $AR(1)$
+```{r}
+# Parametres
+n = 100
+mu = 0
+phi = .9
+sig = 1
+```
+
+```{r}
+set.seed = 2021
+
+# Simulation du process AR(1) avec phi = .9
+z = rnorm(n = n, mean = mu, sd = sig)
+X = numeric(length = n)
+X[1] = rnorm(n = 1, mean = 0, sd = 1)
+for (t in 2:n){
+  X[t] = phi*X[t-1] + (1-phi)*mu + z[t]
+}
+
+# Plot du chronogramme
+par(mfrow = c(1,2), cex = 0.7)
+plot(X, type = 'o',
+     pch = 19,
+     col = 'darkred',
+     xlab = 't', ylab = 'X(t)',
+     main = 'Simulated AR(1)')
+grid(lwd = 0.7)
+
+# Plot ACF
+acf(X,  main = 'ACF avec phi = 0.9', lag = n)
+grid(lwd = 0.7)
+
+# Simulation du process AR(1) avec phi = -.9
+X = numeric(length = n)
+X[1] = rnorm(n = 1, mean = 0, sd = 1)
+phi = -phi
+for (t in 2:n){
+  X[t] = phi*X[t-1] + (1-phi)*mu + z[t]
+}
+
+# Plot du chronogramme
+par(mfrow = c(1,2), cex = 0.7)
+plot(X, type = 'o',
+     pch = 19,
+     col = 'darkred',
+     xlab = 't', ylab = 'X(t)',
+     main = 'Simulated AR(1)')
+grid(lwd = 0.7)
+
+# Plot ACF
+acf(X,  main = 'ACF avec phi = -0.9', lag = n)
+grid(lwd = 0.7)
+```
+
+Commentaires : 
+- La série converge dans les deux cas vers 0 ($norm(\phi) < 1$)
+- Corrélations faibles à partir d'un seuil, dans les deux cas.
+- La deuxième série est alternée, ce qui se comprend bien à cause du $\phi < 0$, la structure des auto-corrélations le confirme.
+
+On change à présent les valeurs de $\sigma$, regardons ce qui se passe. Ici, on fait le choix de $\phi = 0.9$
+```{r}
+sig1 = 0.1
+sig2 = 10
+phi = -0.9
+```
+
+
+```{r}
+set.seed = 2021
+
+# Simulation du process AR(1) avec sig = 0.1
+z = rnorm(n = n, mean = mu, sd = sig1)
+X = numeric(length = n)
+X[1] = rnorm(n = 1, mean = 0, sd = 1)
+for (t in 2:n){
+  X[t] = phi*X[t-1] + (1-phi)*mu + z[t]
+}
+
+# Plot du chronogramme
+par(mfrow = c(1,2), cex = 0.7)
+plot(X, type = 'o',
+     pch = 19,
+     col = 'darkred',
+     xlab = 't', ylab = 'X(t)',
+     main = 'Simulated AR(1)')
+grid(lwd = 0.7)
+
+# Plot ACF
+acf(X,  main = 'ACF avec sig = 0.1', lag = n)
+grid(lwd = 0.7)
+
+# Simulation du process AR(1) avec sig = 10
+z = rnorm(n = n, mean = mu, sd = sig2)
+X = numeric(length = n)
+X[1] = rnorm(n = 1, mean = 0, sd = 1)
+for (t in 2:n){
+  X[t] = phi*X[t-1] + (1-phi)*mu + z[t]
+}
+
+# Plot du chronogramme
+par(mfrow = c(1,2), cex = 0.7)
+plot(X, type = 'o',
+     pch = 19,
+     col = 'darkred',
+     xlab = 't', ylab = 'X(t)',
+     main = 'Simulated AR(1)')
+grid(lwd = 0.7)
+
+# Plot ACF
+acf(X,  main = 'ACF avec sig = 10', lag = n)
+grid(lwd = 0.7)
+```
+
+- Les étalements sont différents pour les deux séries.
+- L'ACF montre toujours la décorrélation entre V.A à partir d'un certain seuil. En effet, 
+$$\gamma(h) = \phi^h \gamma(0)$$ qui dimminue quand $h$ est grand.
+ - Si $abs(\phi) > 1$ alors la série diverge, essayons le cas proche de 1.
+ 
+```{r}
+# Parameters
+sig = 0.1
+phi = 0.99
+```
+
+
+```{r}
+set.seed = 2021
+
+# Simulation du process AR(1) avec phi = .99
+z = rnorm(n = n, mean = mu, sd = sig)
+X = numeric(length = n)
+X[1] = rnorm(n = 1, mean = 0, sd = 1)
+for (t in 2:n){
+  X[t] = phi*X[t-1] + (1-phi)*mu + z[t]
+}
+
+# Plot du chronogramme
+par(mfrow = c(1,2), cex = 0.7)
+plot(X, type = 'o',
+     pch = 19,
+     col = 'darkred',
+     xlab = 't', ylab = 'X(t)',
+     main = 'Simulated AR(1)')
+grid(lwd = 0.7)
+
+# Plot ACF
+acf(X,  main = 'ACF avec phi = 0.9', lag = n)
+grid(lwd = 0.7)
+
+# Simulation du process AR(1) avec phi = -.99
+X = numeric(length = n)
+X[1] = rnorm(n = 1, mean = 0, sd = 1)
+phi = -phi
+for (t in 2:n){
+  X[t] = phi*X[t-1] + (1-phi)*mu + z[t]
+}
+
+# Plot du chronogramme
+par(mfrow = c(1,2), cex = 0.7)
+plot(X, type = 'o',
+     pch = 19,
+     col = 'darkred',
+     xlab = 't', ylab = 'X(t)',
+     main = 'Simulated AR(1)')
+grid(lwd = 0.7)
+
+# Plot ACF
+acf(X,  main = 'ACF avec phi = -0.9', lag = n)
+grid(lwd = 0.7)
+```
+
+- Décroissance très faible des corrélations (regarder la formule de l'ACVF).
+
+Regardons l'effet de $\phi$ très petit
+
+```{r}
+# Parameters
+sig = 0.1
+phi = 0.05
+```
+
+
+```{r}
+set.seed = 2021
+
+# Simulation du process AR(1) avec phi = .01
+z = rnorm(n = n, mean = mu, sd = sig)
+X = numeric(length = n)
+X[1] = rnorm(n = 1, mean = 0, sd = 0.1)
+for (t in 2:n){
+  X[t] = phi*X[t-1] + (1-phi)*mu + z[t]
+}
+
+# Plot du chronogramme
+par(mfrow = c(1,2), cex = 0.7)
+plot(X, type = 'o',
+     pch = 19,
+     col = 'darkred',
+     xlab = 't', ylab = 'X(t)',
+     main = 'Simulated AR(1)')
+grid(lwd = 0.7)
+
+# Plot ACF
+acf(X,  main = 'ACF avec phi = 0.9', lag = n)
+grid(lwd = 0.7)
+
+# Simulation du process AR(1) avec phi = -.01
+X = numeric(length = n)
+X[1] = rnorm(n = 1, mean = 0, sd = 0.1)
+phi = -phi
+for (t in 2:n){
+  X[t] = phi*X[t-1] + (1-phi)*mu + z[t]
+}
+
+# Plot du chronogramme
+par(mfrow = c(1,2), cex = 0.7)
+plot(X, type = 'o',
+     pch = 19,
+     col = 'darkred',
+     xlab = 't', ylab = 'X(t)',
+     main = 'Simulated AR(1)')
+grid(lwd = 0.7)
+
+# Plot ACF
+acf(X,  main = 'ACF avec phi = -0.9', lag = n)
+grid(lwd = 0.7)
+```
